@@ -5,6 +5,7 @@ import router from './router'
 Vue.config.productionTip = false
 
 Vue.filter('formatSize', function (size) {
+  if (!size) { return '0 B' }
   if (size > 1024 * 1024 * 1024 * 1024) {
     return (size / 1024 / 1024 / 1024 / 1024).toFixed(2) + ' TB'
   } else if (size > 1024 * 1024 * 1024) {

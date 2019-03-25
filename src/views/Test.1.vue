@@ -16,9 +16,8 @@
       <div class="example-btn">
         <file-upload
           class="btn btn-primary"
-          :post-action="postUrl"
+          post-action="/upload/post"
           :multiple="true"
-          :thread="3"
           v-model="files"
           @input-filter="inputFilter"
           @input-file="inputFile"
@@ -53,7 +52,6 @@ export default {
   data() {
     return {
       files: [],
-      postUrl: 'http://192.168.6.32:8102/upload?p=BF9B458D2BA60889B5BC5DA383C18DEA'
     }
   },
 
