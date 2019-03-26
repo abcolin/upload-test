@@ -86,6 +86,10 @@ export default {
         // update
         console.log('update', newFile)
       }
+      if (this.$refs.upload.uploaded) {
+        // updated
+        console.log('updated!!!')
+      }
 
       if (!newFile && oldFile) {
         // remove

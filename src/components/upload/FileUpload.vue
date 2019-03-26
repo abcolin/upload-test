@@ -11,6 +11,7 @@
   position: relative;
   text-align: center;
   display: inline-block;
+  vertical-align: middle;
 }
 .file-uploads.file-uploads-html4 input, .file-uploads.file-uploads-html5 label {
   /* background fix ie  click */
@@ -101,8 +102,22 @@ function getNamePre(str) {
     return name;
 }
 
-function parseFileList(files, uploadtype = '') {
-    if (uploadtype == 'tga') {
+function findShortname(shortname, allFileList) {
+    var bfind = false;
+
+    for (var n = 0; n < allFileList.length; n++) {
+        var shortname2 = allFileList[n].name;
+        if (shortname2.toLowerCase() == shortname.toLowerCase()) {
+            bfind = true;
+            break;
+        }
+    }
+
+    return bfind;
+}
+
+function parseFileList(files, uploadType = '') {
+    if (uploadType == 'tga') {
         var filelist = [];
 
         var dataList = [];
@@ -114,14 +129,14 @@ function parseFileList(files, uploadtype = '') {
 
         filelist.push({
             guid: guid,
-            uploadtype: 'tga',
+            uploadType: uploadType,
             dataList: dataList
         });
 
         return filelist;
     }
 
-    if (uploadtype == 'p2') {
+    if (uploadType == 'p2') {
         var filelist = [];
 
         var dataList = [];
@@ -133,7 +148,7 @@ function parseFileList(files, uploadtype = '') {
 
         filelist.push({
             guid: guid,
-            uploadtype: 'p2',
+            uploadType: uploadType,
             dataList: dataList
         });
 
@@ -184,6 +199,7 @@ function parseFileList(files, uploadtype = '') {
                 var guid = NewGuid();
                 filelist.push({
                     guid: guid,
+                    uploadType: uploadType,
                     dataList: dataList
                 });
             }
@@ -194,6 +210,7 @@ function parseFileList(files, uploadtype = '') {
 
             filelist.push({
                 guid: guid,
+                uploadType: uploadType,
                 dataList: dataList
             });
         }
@@ -216,6 +233,7 @@ function parseFileList(files, uploadtype = '') {
                 var guid = NewGuid();
                 filelist.push({
                     guid: guid,
+                    uploadType: uploadType,
                     dataList: a
                 });
             }
@@ -346,7 +364,12 @@ export default {
       default: () => {
         return CHUNK_DEFAULT_OPTIONS
       }
-    }
+    },
+
+    uploadType: {
+      type: String,
+      default: ''
+    },
   },
 
   data() {
@@ -552,22 +575,13 @@ export default {
       if (!isArray) {
         files = [files]
       }
-      console.log(files)
-      files = parseFileList(files);
-      console.log(files)
+      
+      files = parseFileList(files, this.uploadType)
 
       // 遍历规范对象
       let addFiles = []
       for (let i = 0; i < files.length; i++) {
         let file = files[i]
-        // if (this.features.html5 && file instanceof Blob) {
-        //   file = {
-        //     file,
-        //     size: file.size,
-        //     name: file.webkitRelativePath || file.relativePath || file.name || 'unknown',
-        //     type: file.type,
-        //   }
-        // }
         let fileObject = false
         if (file.fileObject === false) {
           // false
@@ -582,12 +596,29 @@ export default {
         for (let j = 0; j < file.dataList.length; j++) {
           size += file.dataList[j].size
         }
+        let shortname = getFileName(file.dataList[0].name)
+        if (this.uploadType == 'tga') {
+            shortname = getNamePre(shortname)
+        } else if (this.uploadType == 'p2') {
+            let path = file.dataList[0].file.webkitRelativePath || ''
+            shortname = path.substring(0, path.indexOf('/'));
+            if (shortname == 'CONTENTS') {
+              shortname = 'P2盘'
+            }
+        }
+        let n = 1;
+        let oldshortname = shortname;
+        while (findShortname(shortname, this.files)) {
+          shortname = oldshortname + '(' + n + ')';
+          n++;
+        }
+
         if (fileObject) {
           file = {
             fileObject: true,
             size: size,
-            name: file.dataList[0].name || 'Filename',
-            type: '',
+            name: shortname,
+            type: file.dataList[0].type || '',
             active: false,
             error: '',
             success: false,
@@ -596,9 +627,11 @@ export default {
             timeout: this.timeout,
             // ...file,
             dataList: file.dataList,
+            uploadType: file.uploadType,
+            privacy: 1,
             response: {},
 
-            progress: '0.00',          // 只读
+            progress: 0,          // 只读
             speed: 0,                  // 只读
             // xhr: false,                // 只读
             // iframe: false,             // 只读
@@ -684,9 +717,11 @@ export default {
       if (el.files) {
         for (let i = 0; i < el.files.length; i++) {
           let file = el.files[i]
+          let path = file.webkitRelativePath || file.relativePath || file.name
+          let name = path.substring(path.indexOf('/') + 1)
           files.push({
             size: file.size,
-            name: file.webkitRelativePath || file.relativePath || file.name,
+            name: name,
             type: file.type,
             file,
           })
@@ -979,18 +1014,18 @@ export default {
       }
 
       if (this.features.html5) {
-        if (this.shouldUseChunkUpload(file)) {
-          return this.uploadChunk(file)
-        }
-        if (file.putAction) {
-          return this.uploadPut(file)
-        }
+        // if (this.shouldUseChunkUpload(file)) {
+        //   return this.uploadChunk(file)
+        // }
+        // if (file.putAction) {
+        //   return this.uploadPut(file)
+        // }
         if (file.postAction) {
           return this.uploadHtml5(file)
         }
       }
       if (file.postAction) {
-        return this.uploadHtml4(file)
+        // return this.uploadHtml4(file)
       }
       return Promise.reject('No action configured')
     },
@@ -1033,57 +1068,65 @@ export default {
       return this.uploadXhr(xhr, file, file.file)
     },
 
-    uploadHtml5(file, uploadtype = '') {
+    uploadHtml5(file) {
       let fd = new window.FormData()
+      let postAction = file.postAction
 
-      if (uploadtype == 'tga') {
-          for (var j = 0; j < file.dataList.length; j++) {
-            fd.append('onefile_' + j, file.dataList[j].file);
-            var title = getNameNum(getFileName(file.dataList[j].file.name));
-            fd.append('onefile_' + j + '_postfix', '_' + title);
+      if (file.uploadType == 'tga') {
+          fd.append('uri_name', file.name + '?_fcc=imsq&start=1&stop=' + file.dataList.length);
+          for (let j = 0; j < file.dataList.length; j++) {
+            fd.append('file_' + (j + 1), file.dataList[j].file);
+            let title = getNameNum(getFileName(file.dataList[j].file.name));
+            fd.append('file_' + (j + 1) + '_rename', '_' + title + '.tga');
           }
-      } else if (uploadtype == 'p2') {
-          var name = '';
-          for (var j = 0; j < file.dataList.length; j++) {
-              fd.append('onefile_' + j, file.dataList[j].file);
-              var path = file.dataList[j].file.webkitRelativePath;
+      } else if (file.uploadType == 'p2') {
+          fd.append('uri_name', file.name + '?_fcc=p2dk');
+          let name = '';
+          for (let j = 0; j < file.dataList.length; j++) {
+            fd.append('file_' + j, file.dataList[j].file);
+            let path = file.dataList[j].file.webkitRelativePath;
 
-              if (name.length == 0) {
-                  name = path.substring(0, path.indexOf('/'));
-              }
+            if (name.length == 0) {
+              name = path.substring(0, path.indexOf('/'));
+            }
 
-              var relativePath = '';
-              var shortname = path.substring(0, path.indexOf('/'));
-              if (shortname == 'CONTENTS') {
-                  relativePath = path;
-              } else {
-                  relativePath = path.substring(path.indexOf('/') + 1);
-              }
+            let relativePath = '';
+            let shortname = path.substring(0, path.indexOf('/'));
+            if (shortname == 'CONTENTS') {
+              relativePath = path;
+            } else {
+              relativePath = path.substring(path.indexOf('/') + 1);
+            }
 
-              var rename = relativePath;
-              fd.append('onefile_' + j + '_rename', rename);
+            let rename = relativePath;
+            fd.append('file_' + j + '_rename', rename);
           }
 
-          fd.append('folders', 'CONTENTS/AVCLIP;CONTENTS/PROXY;CONTENTS/VOICE');
-          fd.append('file', 'LASTCLIP.TXT');
+          fd.append('empty_folders', 'CONTENTS/AVCLIP;CONTENTS/PROXY;CONTENTS/VOICE');
+          fd.append('empty_files', 'LASTCLIP.TXT');
 
-          name = '';
-          fd.append('name', name);
-
-          file.postAction = file.postAction + '&type=multi';
+          postAction = file.postAction + '&type=multi';
       } else {
-        for (var j = 0; j < file.dataList.length; j++) {
-          fd.append('onefile', file.dataList[j].file, file.dataList[j].file.name || file.name)
-          var path = file.dataList[j].name;
-          path = path.toLowerCase();
-          if (path.substr(-7) == '.a3.wav') {
-            file.postAction = file.postAction + '&title=' + file.dataList[j].file.name + '.a3';
+        if (file.dataList.length > 1) {
+          fd.append('uri_name', file.name + '?_fcc=saud&audio=wav');
+          for (var j = 0; j < file.dataList.length; j++) {
+            fd.append('file_' + j, file.dataList[j].file);
+            fd.append('file_' + j + '_rename', file.dataList[j].name);
+
+            let path = file.dataList[j].name;
+            path = path.toLowerCase();
+            if (path.substr(-7) == '.a3.wav') {
+              postAction = file.postAction + '&title=' + file.dataList[j].file.name + '.a3';
+            }
           }
+        } else {
+          fd.append('uri_name', file.name);
+          fd.append('file_0', file.dataList[0].file);
         }
       }
 
       let xhr = new XMLHttpRequest()
-      xhr.open('POST', file.postAction)
+      xhr.open('POST', postAction)
       return this.uploadXhr(xhr, file, fd)
     },
 
@@ -1108,7 +1151,7 @@ export default {
         speedTime = speedTime2
 
         file = this.update(file, {
-          progress: (e.loaded / e.total * 100).toFixed(2),
+          progress: parseInt(e.loaded / e.total * 100),
           speed: e.loaded - speedLoaded,
         })
         speedLoaded = e.loaded
@@ -1196,7 +1239,7 @@ export default {
               } else if (xhr.status >= 400) {
                 data.error = 'denied'
               } else {
-                data.progress = '100.00'
+                data.progress = 100
               }
           }
 
@@ -1408,7 +1451,7 @@ export default {
                 } else if (data === null) {
                   data.error = 'network'
                 } else {
-                  data.progress = '100.00'
+                  data.progress = 100
                 }
             }
 
