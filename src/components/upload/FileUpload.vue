@@ -1073,11 +1073,13 @@ export default {
       let postAction = file.postAction
 
       if (file.uploadType == 'tga') {
-          fd.append('uri_name', file.name + '?_fcc=imsq&start=1&stop=' + file.dataList.length);
+          let start = getNameNum(getFileName(file.dataList[0].file.name));
+          let stop = getNameNum(getFileName(file.dataList[file.dataList.length - 1].file.name));
+          fd.append('uri_name', file.name + '.tga?_fcc=imsq&start='+ start +'&stop=' + stop);
           for (let j = 0; j < file.dataList.length; j++) {
-            fd.append('file_' + (j + 1), file.dataList[j].file);
+            fd.append('file_' + j, file.dataList[j].file);
             let title = getNameNum(getFileName(file.dataList[j].file.name));
-            fd.append('file_' + (j + 1) + '_rename', '_' + title + '.tga');
+            fd.append('file_' + j + '_rename', file.name + '_' + title + '.tga');
           }
       } else if (file.uploadType == 'p2') {
           fd.append('uri_name', file.name + '?_fcc=p2dk');
@@ -1108,19 +1110,15 @@ export default {
           postAction = file.postAction + '&type=multi';
       } else {
         if (file.dataList.length > 1) {
-          fd.append('uri_name', file.name + '?_fcc=saud&audio=wav');
+          let ext = getFileExt(file.dataList[1].name);
+
+          fd.append('uri_name', file.dataList[0].name + '?_fcc=saud&audio=' + ext);
           for (var j = 0; j < file.dataList.length; j++) {
             fd.append('file_' + j, file.dataList[j].file);
             fd.append('file_' + j + '_rename', file.dataList[j].name);
-
-            let path = file.dataList[j].name;
-            path = path.toLowerCase();
-            if (path.substr(-7) == '.a3.wav') {
-              postAction = file.postAction + '&title=' + file.dataList[j].file.name + '.a3';
-            }
           }
         } else {
-          fd.append('uri_name', file.name);
+          fd.append('uri_name', file.dataList[0].name);
           fd.append('file_0', file.dataList[0].file);
         }
       }
